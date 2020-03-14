@@ -4,7 +4,8 @@
   "description": "OpenTibiaLoginServer",
   "main": "build/app.js",
   "author": {
-    "name": "otclient@otclient.ovh"
+    "name": "otclient@otclient.ovh",
+    "url": "http://otclient.ovh"
   },
   "scripts": {
     "build": "tsc --build",
@@ -12,10 +13,13 @@
     "start": "node build/app.js"
   },
   "devDependencies": {
+    "@types/mysql2": "github:types/mysql2",
     "@types/node": "^8.0.14",
+    "@types/xml2js": "^0.4.5",
     "typescript": "^3.2.2"
   },
   "dependencies": {
-    "xtea": "^1.0.0"
+    "mysql2": "^2.1.0",
+    "xml2js": "^0.4.23"
   }
 }

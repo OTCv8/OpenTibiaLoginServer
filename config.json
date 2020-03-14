@@ -1,5 +1,19 @@
 {
   "ip": "127.0.0.1",
   "port": 7171,
-  "keyFile": "key.pem"
+  "keyFile": "key.pem",
+  "encryption": "sha1",
+  "mysql": {
+    "host": "otclient.ovh",
+    "user": "otclient",
+    "password": "otclient",
+    "database": "otclient"
+  },
+  "worlds": {
+    "0": {
+      "name": "Main world",
+      "host": "163.172.147.135",
+      "port": 7172
+    }
+  }
 }
