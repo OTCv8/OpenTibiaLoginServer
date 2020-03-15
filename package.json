@@ -19,7 +19,9 @@
     "typescript": "^3.2.2"
   },
   "dependencies": {
+    "async-mutex": "^0.1.4",
     "mysql2": "^2.1.0",
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v17.3.0",
     "xml2js": "^0.4.23"
   }
 }

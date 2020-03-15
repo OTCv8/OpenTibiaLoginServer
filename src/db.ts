@@ -1,6 +1,8 @@
 import * as mysql from 'mysql2/promise';
-import Config from './config';
 import { RowDataPacket } from 'mysql2/promise';
+import { Mutex, MutexInterface } from 'async-mutex';
+
+import Config from './config';
 
 interface Account {
     id: number;
@@ -18,27 +20,36 @@ interface Character {
 }
 
 class DB {
-    private conn: mysql.Connection = null;
+    private conn: mysql.Pool = null;
+    private mutex = new Mutex();
 
     start = async () => {
         if (this.conn) {
             throw "DB has already started";
         }
-
-        this.conn = await mysql.createConnection({
+        this.conn = await mysql.createPool({
             host: Config.mysql.host,
             user: Config.mysql.user,
             password: Config.mysql.password,
-            database: Config.mysql.database
+            database: Config.mysql.database,
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 1000           
         });
+        await this.conn.query("SELECT 1"); // check connection
     }
 
     stop = async () => {
         await this.conn.end();
     }
 
+    query = async (query: string, params?: any[]): Promise<RowDataPacket[]> => {
+        let [result, fields] = await this.conn.execute<RowDataPacket[]>(query, params);
+        return result;
+    }
+
     loadAccountById = async (id: string): Promise<Account> => {
-        const [accounts, fields] = await this.conn.execute<RowDataPacket[]>('SELECT * FROM `accounts` where `id` = ?', [id]);
+        const accounts = await this.query('SELECT * FROM `accounts` where `id` = ?', [id]);
         if (accounts.length != 1) {
             return null;
         }
@@ -46,7 +57,7 @@ class DB {
     }
 
     loadAccountByName = async (name: string): Promise<Account> => {
-        const [accounts, fields] = await this.conn.execute<RowDataPacket[]>('SELECT * FROM `accounts` where `name` = ?', [name]);
+        const accounts = await this.query('SELECT * FROM `accounts` where `name` = ?', [name]);
         if (accounts.length != 1) {
             return null;
         }
@@ -56,7 +67,7 @@ class DB {
     private parseAccount = (account: RowDataPacket): Account => {
         return {
             id: account.id,
-            name: account.name,
+            name: account.name || account.id,
             password: account.password,
             type: account.type,
             premdays: account.premdays,
@@ -65,7 +76,7 @@ class DB {
     }
 
     loadCharactersByAccountId = async (accountId: number|string): Promise<Character[]> => {
-        const [characters, fields] = await this.conn.execute<RowDataPacket[]>('SELECT * FROM `players` where `account_id` = ?', [accountId]);
+        let characters = await this.query('SELECT * FROM `players` where `account_id` = ?', [accountId]);
         let ret: Character[] = [];
         for (let i = 0; i < characters.length; ++i) {
             ret.push(this.parseCharacter(characters[i]));

@@ -1,20 +1,26 @@
 import Config from './config';
 import Crypto from './crypto';
 import DB from './db';
-import TibiaTCP from './tcp';
+import Server from './server';
 
-let tcp = new TibiaTCP();
-let working = true;
+let working = false;
+let server = new Server();
 
 console.log("Starting Open Tibia Login Server...");
 Crypto.init();
 
 DB.start().then(() => {
     console.log("Connected to mysql database");
-    tcp.start();
-    console.log("Running");
+    server.start().then(() => {
+        console.log("Running");
+        working = true;
+    }).catch((e) => {
+        DB.stop();
+        console.log("Error: can't start server");
+        console.log(e);
+        process.exit(-1);
+    });
 }).catch((e) => {
-    working = false;
     console.log("Error: can't connect to mysql host");
     console.log(e);
     process.exit(-1);
@@ -24,7 +30,7 @@ let quit = () => {
     if (!working) return;
     working = false;
     console.log("Exiting...");
-    tcp.stop();
+    server.stop();
     DB.stop();
 }
 

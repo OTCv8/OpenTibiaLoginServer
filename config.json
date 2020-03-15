@@ -9,6 +9,10 @@
     "password": "otclient",
     "database": "otclient"
   },
+  "http": {
+    "host": "127.0.0.1",
+    "port": 8000
+  },
   "worlds": {
     "0": {
       "name": "Main world",
