@@ -5,7 +5,11 @@ try {
     try {
         Config = require("../config.json");
     } catch (e) {
-        throw "Missing config.json";
+        try {
+            Config = require("../../config.json");
+        } catch (e) {
+            throw "Missing config.json";
+        }
     }
 }
 

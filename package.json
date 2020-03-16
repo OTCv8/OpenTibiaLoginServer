@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc --build",
     "clean": "tsc --build --clean",
-    "start": "node build/app.js"
+    "start": "node build/src/app.js",
+    "benchmark": "node build/tests/benchmark.js"
   },
   "devDependencies": {
     "@types/mysql2": "github:types/mysql2",

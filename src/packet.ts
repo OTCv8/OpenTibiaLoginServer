@@ -87,6 +87,10 @@ export class InputPacket {
     adler32 = (): number => {
         return Crypto.adler32(this.buffer, this.pos + 4, this.buffer.length - this.pos - 4);
     }
+
+    toHexString = () => {
+        return this.buffer.toString('hex');
+    }
 }
 
 export class OutputPacket {

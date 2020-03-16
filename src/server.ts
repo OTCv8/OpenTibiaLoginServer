@@ -14,6 +14,10 @@ export default class Server {
     socket: us_listen_socket;
         
     start = async () => {
+        if (this.socket) {
+            throw "Server is already running";
+        }
+
         this.tcp = new TibiaTCP();
         this.app = App({});
         this.http = new TibiaHTTP();
@@ -26,6 +30,7 @@ export default class Server {
         return await new Promise((resolve) => {
             this.app.listen(Config.http.host, Config.http.port, (listenSocket) => {
                 if (listenSocket) {
+                    this.socket = listenSocket;
                     resolve();
                 }
             });
@@ -36,7 +41,10 @@ export default class Server {
         this.tcp.stop();
         this.http.stop();
         this.ws.stop();
-        us_listen_socket_close(this.socket);
+        if (this.socket) {
+            us_listen_socket_close(this.socket);
+            this.socket = null;
+        }
     }
 
 }

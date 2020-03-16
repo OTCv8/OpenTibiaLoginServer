@@ -109,6 +109,8 @@ export default class TibiaTCP {
 
     // return true = keep connection and wait for next packet, return false = close connection, throw = destroy connection
     private onSocketPacket = async (socket: net.Socket, packet: InputPacket): Promise<boolean> => {
+        //console.log(packet.toHexString()); // may be used for benchmark
+
         const checksum = packet.peekU32();
         if (checksum == packet.adler32()) {
             packet.getU32(); // read checksum
@@ -213,8 +215,7 @@ export default class TibiaTCP {
             outputPacket.addU8(character.world_id);
             outputPacket.addString(character.name);
         });
-        console.log(outputPacket.getSendBuffer());
-
+        
         // premium
         outputPacket.addU8(0); // premium status
         outputPacket.addU8(account.premdays > 0 ? 1 : 0); // premium substatus
@@ -229,6 +230,14 @@ export default class TibiaTCP {
         packet.addChecksum();
         packet.addSize();
 
-        socket.write(packet.getSendBuffer());
+        if (socket) { // it's null when benchmarking
+            socket.write(packet.getSendBuffer());
+        }
+    }
+
+    public benchmark = async (packet: Buffer) => {
+        try {
+            return await this.onSocketPacket(null, new InputPacket(packet));
+        } catch (e) { }
     }
 }

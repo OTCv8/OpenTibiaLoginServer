@@ -34,7 +34,7 @@ class DB {
             database: Config.mysql.database,
             waitForConnections: true,
             connectionLimit: 10,
-            queueLimit: 1000           
+            queueLimit: 10000
         });
         await this.conn.query("SELECT 1"); // check connection
     }
