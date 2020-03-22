@@ -1,15 +1,23 @@
 {
-  "ip": "127.0.0.1",
-  "port": 7171,
   "keyFile": "key.pem",
   "encryption": "sha1",
+  "version": {
+    "min": 760,
+    "max": 1100
+  },
   "mysql": {
     "host": "otclient.ovh",
     "user": "otclient",
     "password": "otclient",
     "database": "otclient"
   },
+  "tcp": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 7171
+  },
   "http": {
+    "enabled": true,
     "host": "127.0.0.1",
     "port": 8000
   },
@@ -18,6 +26,16 @@
       "name": "Main world",
       "host": "163.172.147.135",
       "port": 7172
+    }
+  },
+  "limits": {
+    "connections": {
+      "interval": [ 10, 180 ],
+      "limit": [ 10, 60 ]
+    },
+    "authorizations": {
+      "interval": [ 60, 1800 ],
+      "limit": [ 5, 20 ]
     }
   }
 }

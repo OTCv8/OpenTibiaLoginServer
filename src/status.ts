@@ -4,7 +4,7 @@ import { Builder } from 'xml2js';
 class Status {
     builder = new Builder();
 
-    process = async (packet: InputPacket): Promise<OutputPacket> => {
+    process = async (host: string, port: number, packet: InputPacket): Promise<OutputPacket> => {
         let outputPacket = new OutputPacket();
         let type = packet.getU8();
         if (type == 0xFF) { // general info

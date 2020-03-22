@@ -14,36 +14,45 @@ export default class Server {
     socket: us_listen_socket;
         
     start = async () => {
-        if (this.socket) {
-            throw "Server is already running";
+        if (Config.tcp.enabled && !this.tcp) {
+            this.tcp = new TibiaTCP();
+            this.tcp.start(Config.tcp.host, Config.tcp.port);
         }
 
-        this.tcp = new TibiaTCP();
-        this.app = App({});
-        this.http = new TibiaHTTP();
-        this.ws = new TibiaWebSocket();
+        if (Config.http.enabled && !this.app) {
+            this.app = App({});
+            this.http = new TibiaHTTP();
+            this.ws = new TibiaWebSocket();
 
-        this.tcp.start();
-        this.http.start(this.app);
-        this.ws.start(this.app);
+            this.http.start(this.app);
+            this.ws.start(this.app);
 
-        return await new Promise((resolve) => {
-            this.app.listen(Config.http.host, Config.http.port, (listenSocket) => {
-                if (listenSocket) {
-                    this.socket = listenSocket;
-                    resolve();
-                }
+            return await new Promise((resolve) => {
+                this.app.listen(Config.http.host, Config.http.port, (listenSocket) => {
+                    if (listenSocket) {
+                        this.socket = listenSocket;
+                        resolve();
+                    }
+                });
             });
-        });
+        }
     }
 
     stop = () => {
-        this.tcp.stop();
-        this.http.stop();
-        this.ws.stop();
-        if (this.socket) {
-            us_listen_socket_close(this.socket);
-            this.socket = null;
+        if (this.tcp) {
+            this.tcp.stop();
+            this.tcp = null;
+        }
+        if (this.app) {
+            this.http.stop();
+            this.ws.stop();
+            if (this.socket) {
+                us_listen_socket_close(this.socket);
+                this.socket = null;
+            }
+            this.http = null;
+            this.ws = null;
+            this.app = null;
         }
     }
 

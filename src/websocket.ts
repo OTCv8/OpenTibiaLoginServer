@@ -1,4 +1,5 @@
 import { TemplatedApp, WebSocket, HttpResponse } from 'uWebSockets.js';
+import Limits from './limits';
 
 export default class TibiaWebSocket {
 
@@ -17,8 +18,11 @@ export default class TibiaWebSocket {
 
     }
 
-    private onOpen = (ws, req) => {
-
+    private onOpen = (ws: WebSocket, req) => {
+        if (!Limits.acceptConnection(Buffer.from(ws.getRemoteAddress()))) {
+            return ws.close();
+        }
+        
     }
 
     private onClose = (ws, code, message) => {

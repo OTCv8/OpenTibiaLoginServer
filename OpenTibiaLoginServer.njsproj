@@ -41,6 +41,7 @@
   <ItemGroup>
     <Folder Include="build\" />
     <Folder Include="src\" />
+    <Folder Include="tests\" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="src\app.ts" />
@@ -54,6 +55,9 @@
       <SubType>Code</SubType>
     </TypeScriptCompile>
     <TypeScriptCompile Include="src\http.ts">
+      <SubType>Code</SubType>
+    </TypeScriptCompile>
+    <TypeScriptCompile Include="src\limits.ts">
       <SubType>Code</SubType>
     </TypeScriptCompile>
     <TypeScriptCompile Include="src\packet.ts">
@@ -71,6 +75,7 @@
     <TypeScriptCompile Include="src\websocket.ts">
       <SubType>Code</SubType>
     </TypeScriptCompile>
+    <TypeScriptCompile Include="tests\benchmark.ts" />
   </ItemGroup>
   <Import Project="$(VSToolsPath)\Node.js Tools\Microsoft.NodejsToolsV2.targets" />
   <ProjectExtensions>

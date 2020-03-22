@@ -48,7 +48,7 @@ class DB {
         return result;
     }
 
-    loadAccountById = async (id: string): Promise<Account> => {
+    loadAccountById = async (id: number): Promise<Account> => {
         const accounts = await this.query('SELECT * FROM `accounts` where `id` = ?', [id]);
         if (accounts.length != 1) {
             return null;

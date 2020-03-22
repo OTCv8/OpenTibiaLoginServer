@@ -1,12 +1,19 @@
-import { TemplatedApp, WebSocket, HttpResponse } from 'uWebSockets.js';
+import { TemplatedApp, WebSocket, HttpRequest, HttpResponse } from 'uWebSockets.js';
+import Limits from './limits';
 
 export default class TibiaHTTP {
 
     start = (app: TemplatedApp) => {
         app.options("/*", (res, req) => {
+            if (!Limits.acceptConnection(Buffer.from(res.getRemoteAddress()))) {
+                return res.close();
+            }
             this.writeHeaders(res);
             res.end();
-        }).any("/*", (res, req) => {
+        }).any("/*", (res: HttpResponse, req: HttpRequest) => {
+            if (!Limits.acceptConnection(Buffer.from(res.getRemoteAddress()))) {
+                return res.close();
+            }
             this.writeHeaders(res);
             res.end("Open Tibia Login Server");
         })

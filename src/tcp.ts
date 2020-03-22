@@ -3,8 +3,11 @@ import * as net from 'net';
 import Config from './config';
 import Crypto from './crypto';
 import DB from './db';
+import Limits from './limits';
 import { InputPacket, OutputPacket } from './packet';
+import { getMotd } from './motd';
 import Status from './status';
+import { ip2int } from './utils';
 
 const TIMEOUT = 15000;
 const MAX_PACKET_SIZE = 1024;
@@ -17,16 +20,17 @@ interface ConnectionData {
 
 export default class TibiaTCP {
     private server: net.Server = null;
+    private host: string;
+    private port: number;
     private connections: Map<net.Socket, ConnectionData> = new Map();
 
-    public start = () => {
+    public start = (host: string, port: number) => {
         if (this.server) {
             throw "TCP login server is already running";
         }
-        this.server = net.createServer(this.onConnection);
-        this.server.on("error", this.onError)
-        this.server.on("close", this.onClose);
-        this.server.listen(Config.port, Config.ip);
+        this.host = host;
+        this.port = port;
+        this.bind(false);
     }
 
     public stop = () => {
@@ -40,16 +44,31 @@ export default class TibiaTCP {
         });
     }
 
+    private bind = (rebind: boolean) => {
+        if (rebind && !this.server)
+            return;
+        this.server = net.createServer(this.onConnection);
+        this.server.on("error", this.onError)
+        this.server.on("close", this.onClose);
+        this.server.listen(this.port, this.host);
+    }
+
     private onClose = () => {
         this.server = null;
     }
 
     private onError = (error: Error) => {
-        console.log("onError", error);
-        //TODO: call listen again after some time
+        console.log("TCP Server error: ", error);
+        console.log("Rebinding in 1s");
+        setTimeout(this.bind, 1000, true).unref();
     }
 
     private onConnection = (socket: net.Socket) => {
+        if (!Limits.acceptConnection(socket.address().address)) {
+            socket.destroy();
+            return;
+        }
+
         this.connections.set(socket, {
             size: 0,
             pos: 0,
@@ -93,10 +112,9 @@ export default class TibiaTCP {
             socketData.pos += copiedBytes;
             if (socketData.pos = socketData.size) {
                 try {
-                    if (await this.onSocketPacket(socket, new InputPacket(socketData.packet)) !== true) {
-                        socket.end();
-                        break;
-                    }
+                    await this.onSocketPacket(socket, new InputPacket(socketData.packet));
+                    socket.end();
+                    break; // end connection after first packet
                 } catch (e) { // invalid packet
                     console.log(e);
                     socket.destroy();
@@ -107,64 +125,114 @@ export default class TibiaTCP {
         }
     }
 
-    // return true = keep connection and wait for next packet, return false = close connection, throw = destroy connection
-    private onSocketPacket = async (socket: net.Socket, packet: InputPacket): Promise<boolean> => {
+    // throw = destroy connection
+    private onSocketPacket = async (socket: net.Socket, packet: InputPacket) => {
         //console.log(packet.toHexString()); // may be used for benchmark
 
+        let has_checksum = false;
         const checksum = packet.peekU32();
         if (checksum == packet.adler32()) {
             packet.getU32(); // read checksum
+            has_checksum = true;
         }
 
         const packet_type = packet.getU8();
         if (packet_type == 0xFF) { // status check
-            let output = await Status.process(packet);
+            let output = await Status.process(this.host, this.port, packet);
             if (output) {
                 socket.write(output.getSendBuffer());
             }
-            return false;
+            return;
+        }
+
+        if (packet_type != 0x01) {
+            throw `Invalid packet type: ${packet_type}, should be 1`;
         }
 
         const os = packet.getU16();
         const version = packet.getU16();
-        const client_version = packet.getU32();
-        const data_signature = packet.getU32();
+        if (version >= 980) {
+            const client_version = packet.getU32();
+        }
+        if (version >= 1071) {
+            const content_revision = packet.getU16();
+            packet.getU16(); // unkown, otclient sends 0
+        } else {
+            const data_signature = packet.getU32();
+        }
         const spr_signature = packet.getU32();
         const pic_signature = packet.getU32();
-        const preview_state = packet.getU8();
-
-        let decryptedPacket = packet.rsaDecrypt();
-        if (decryptedPacket.getU8() != 0) {
-            throw "RSA decryption error (1)";
+        if (version >= 980) {
+            const preview_state = packet.getU8();
         }
 
-        let xtea = [decryptedPacket.getU32(), decryptedPacket.getU32(), decryptedPacket.getU32(), decryptedPacket.getU32()];
-        let account_name = decryptedPacket.getString();
+        let decryptedPacket = packet;
+        let xtea = null;
+        if (version >= 770) { // encryption has been added in 770
+            decryptedPacket = packet.rsaDecrypt();
+            if (decryptedPacket.getU8() != 0) {
+                throw "RSA decryption error (1)";
+            }
+
+            xtea = [decryptedPacket.getU32(), decryptedPacket.getU32(), decryptedPacket.getU32(), decryptedPacket.getU32()];
+        }
+
+        let account_name;
+        if (version >= 840) {
+            account_name = decryptedPacket.getString();;
+        } else {
+            account_name = decryptedPacket.getU32();
+        }
         let account_password = decryptedPacket.getString();
 
-        let oglInfo1 = packet.getU8();
-        let oglInfo2 = packet.getU8();
-        let gpu = packet.getString();
-        let gpu_version = packet.getString();
+        // otclient extended data, optional
+        // decryptedPacket.getString();
 
-        let decryptedAuthPacket = packet.rsaDecrypt();
-        if (decryptedAuthPacket.getU8() != 0) {
-            throw "RSA decryption error (2)";
+        if (version >= 1061) { // gpu info, unused by now
+            const oglInfo1 = packet.getU8();
+            const oglInfo2 = packet.getU8();
+            const gpu = packet.getString();
+            const gpu_version = packet.getString();
         }
-        let token = decryptedAuthPacket.getString();
-        let stayLogged = decryptedAuthPacket.getU8();
+
+        let token;
+        let stayLogged = true;
+        if (version >= 1072) { // auth token, unused by now
+            let decryptedAuthPacket = packet.rsaDecrypt();
+            if (decryptedAuthPacket.getU8() != 0) {
+                throw "RSA decryption error (2)";
+            }
+            token = decryptedAuthPacket.getString();
+            if (version >= 1074) {
+                stayLogged = decryptedAuthPacket.getU8() > 0;
+            }            
+        }
 
         // function to make sending error easier
-        const loginError = (error: string): boolean => {
+        const loginError = (error: string) => {
             let outputPacket = new OutputPacket();
             outputPacket.addU8(version >= 1076 ? 0x0B : 0x0A);
             outputPacket.addString(error);
-            this.send(version, socket, outputPacket, xtea);
-            return false;
+            this.send(socket, outputPacket, has_checksum, xtea);
         }
 
-        let account = await DB.loadAccountByName(account_name);
+        if (Config.version.min > version || version > Config.version.max) {
+            return loginError(`Invalid client version (should be: ${Config.version.min}-${Config.version.max}, is: ${version}).`);
+        }
+
+        if (!Limits.acceptAuthorization(socket.address().address)) {
+            return loginError("Too many login attempts.\nYou has been blocked for few minutes.");
+        }
+
+        let account;
+        if (typeof (account_name) == 'number') {
+            account = await DB.loadAccountById(account_name); // by id, for <840
+        } else {
+            account = await DB.loadAccountByName(account_name); // by name, for >=840
+        }
+
         if (!account) {
+            Limits.addInvalidAuthorization(socket.address().address);
             return loginError("Invalid account/password");
         }
 
@@ -180,6 +248,7 @@ export default class TibiaTCP {
         }
 
         if (account.password != hashed_password) {
+            Limits.addInvalidAuthorization(socket.address().address);
             return loginError("Invalid account/password");
         }
 
@@ -188,46 +257,78 @@ export default class TibiaTCP {
         let outputPacket = new OutputPacket();
 
         // motd
-        outputPacket.addU8(0x14);
-        outputPacket.addString("1\rTest motd");
+        let motd = getMotd(account.id);
+        if (motd) {
+            outputPacket.addU8(0x14);
+            outputPacket.addString(motd);
+        }
 
         // session key
-        outputPacket.addU8(0x28);
-        outputPacket.addString(`${account_name}\n${account_password}\n${token}\n0`);
+        if (version >= 1074) {
+            outputPacket.addU8(0x28);
+            outputPacket.addString(`${account_name}\n${account_password}\n${token}\n${Math.floor(Date.now() / 1000)}`);
+        }
 
         // worlds & characters & premium
         outputPacket.addU8(0x64);
 
-        // worlds
-        outputPacket.addU8(Object.keys(Config.worlds).length);
-        for (let worldId in Config.worlds) {
-            const world = Config.worlds[worldId];
-            outputPacket.addU8(parseInt(worldId));
-            outputPacket.addString(world.name);
-            outputPacket.addString(world.host);
-            outputPacket.addU16(world.port);
-            outputPacket.addU8(0); // preview
-        }
+        if (version >= 1010) {
+            // worlds
+            outputPacket.addU8(Object.keys(Config.worlds).length);
+            for (let worldId in Config.worlds) {
+                const world = Config.worlds[worldId];
+                outputPacket.addU8(parseInt(worldId));
+                outputPacket.addString(world.name);
+                outputPacket.addString(world.host);
+                outputPacket.addU16(world.port);
+                outputPacket.addU8(0); // preview
+            }
 
-        // characters
-        outputPacket.addU8(characters.length);
-        characters.forEach(character => {
-            outputPacket.addU8(character.world_id);
-            outputPacket.addString(character.name);
-        });
+            // characters
+            outputPacket.addU8(characters.length);
+            characters.forEach(character => {
+                outputPacket.addU8(character.world_id);
+                outputPacket.addString(character.name);
+            });
+        } else {
+            outputPacket.addU8(characters.length);
+            characters.forEach(character => {
+                outputPacket.addString(character.name);
+                let world = Config.worlds[character.world_id.toString()]; // keys are numbers
+                if (!world) {
+                    outputPacket.addString("INVALID WORLD")
+                    outputPacket.addU32(0);
+                    outputPacket.addU16(0);
+                } else {
+                    outputPacket.addString(world.name);
+                    outputPacket.addU32(ip2int(world.host));
+                    outputPacket.addU16(world.port);
+                }
+                if (version >= 980) {
+                    outputPacket.addU8(0); // preview state
+                }
+            });
+        }
         
         // premium
-        outputPacket.addU8(0); // premium status
-        outputPacket.addU8(account.premdays > 0 ? 1 : 0); // premium substatus
-        outputPacket.addU32(account.premdays);
+        if (version > 1077) {
+            outputPacket.addU8(0); // account status: 0 - OK, 1 - Frozen, 2 - Suspended
+            outputPacket.addU8(account.premdays > 0 ? 1 : 0); // premium status: 0 - Free, 1 - Premium
+            outputPacket.addU32(account.premdays);
+        } else {
+            outputPacket.addU16(account.premdays);
+        }
 
-        this.send(version, socket, outputPacket, xtea);
-        return false; // close connection
+        this.send(socket, outputPacket, has_checksum, xtea);
     }
 
-    private send(version: number, socket: net.Socket, packet: OutputPacket, xtea?: number[]) {
-        packet.xteaEncrypt(xtea);
-        packet.addChecksum();
+    private send(socket: net.Socket, packet: OutputPacket, has_checksum: boolean, xtea?: number[]) {
+        if (xtea) {
+            packet.xteaEncrypt(xtea);
+        }
+        if (has_checksum) {
+            packet.addChecksum();
+        }
         packet.addSize();
 
         if (socket) { // it's null when benchmarking
