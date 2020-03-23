@@ -1,0 +1,10 @@
+{
+  "id": 0,
+  "name": "Main world",
+  "host": "163.172.147.135",
+  "port": 7172,
+  "preview": false,
+  "location": "EUR",
+  "pvptype": 1,
+  "status_port": 7171
+}

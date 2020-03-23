@@ -8,7 +8,7 @@
 * Very easy to develop and extend
 * Works on almost any operating system
 * Fast, should be able to handle 1000 operations/s
-* Support for classic (tcp) and new (http) tibia login 
+* Support for classic (tcp, 7.40-11.00) and new (http) tibia login 
 * Support for websockets (otclientv8 login)
 * Support for status for ots list
 * Support for autorization token
@@ -26,7 +26,7 @@
 1. Install nodejs: `apt install nodejs` or https://nodejs.org/en/download/
 2. Install dependencies, inside project dir run: `npm install`
 3. Build project: `npm run build`
-4. Configure it, edit `config.json`
+4. Configure it, edit `config.json` and your worlds in `worlds` dir
 5. If you use custom rsa key, upload your `key.pem`
 6. Run it: `npm start`
 

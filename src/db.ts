@@ -16,7 +16,9 @@ interface Account {
 interface Character {
     id: number,
     name: string,
-    world_id: number
+    world_id: number,
+    level: number,
+    sex: number
 }
 
 class DB {
@@ -89,6 +91,8 @@ class DB {
             id: character.id,
             name: character.name,
             world_id: character.world_id || 0,
+            level: character.level,
+            sex: character.sex
         }
     }
 

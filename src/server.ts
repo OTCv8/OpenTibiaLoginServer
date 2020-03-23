@@ -8,18 +8,21 @@ import TibiaWebSocket from './websocket';
 
 export default class Server {
     app: TemplatedApp;
-    tcp: TibiaTCP;
+    tcps: TibiaTCP[] = [];
     http: TibiaHTTP;
     ws: TibiaWebSocket;
-    socket: us_listen_socket;
-        
+    sockets: us_listen_socket[] = [];
+
     start = async () => {
-        if (Config.tcp.enabled && !this.tcp) {
-            this.tcp = new TibiaTCP();
-            this.tcp.start(Config.tcp.host, Config.tcp.port);
+        if (Config.tcp.enabled) {
+            Config.tcp.ports.forEach(port => {
+                let tcp = new TibiaTCP();
+                tcp.start(Config.tcp.host, port);
+                this.tcps.push(tcp);
+            })
         }
 
-        if (Config.http.enabled && !this.app) {
+        if (Config.http.enabled) {
             this.app = App({});
             this.http = new TibiaHTTP();
             this.ws = new TibiaWebSocket();
@@ -27,29 +30,33 @@ export default class Server {
             this.http.start(this.app);
             this.ws.start(this.app);
 
-            return await new Promise((resolve) => {
-                this.app.listen(Config.http.host, Config.http.port, (listenSocket) => {
-                    if (listenSocket) {
-                        this.socket = listenSocket;
-                        resolve();
-                    }
+            Config.http.ports.forEach(async (port) => {
+                await new Promise((resolve) => {
+                    this.app.listen(Config.http.host, port, (listenSocket) => {
+                        if (listenSocket) {
+                            this.sockets.push(listenSocket);
+                            resolve();
+                        }
+                    });
                 });
             });
         }
     }
 
     stop = () => {
-        if (this.tcp) {
-            this.tcp.stop();
-            this.tcp = null;
-        }
+        this.tcps.forEach(tcp => {
+            tcp.stop();
+        });
+        this.tcps = [];
+
+        this.sockets.forEach(socket => {
+            us_listen_socket_close(socket);
+        });
+        this.sockets = [];
+
         if (this.app) {
             this.http.stop();
             this.ws.stop();
-            if (this.socket) {
-                us_listen_socket_close(this.socket);
-                this.socket = null;
-            }
             this.http = null;
             this.ws = null;
             this.app = null;

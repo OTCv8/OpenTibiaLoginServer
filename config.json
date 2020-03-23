@@ -2,7 +2,7 @@
   "keyFile": "key.pem",
   "encryption": "sha1",
   "version": {
-    "min": 760,
+    "min": 800,
     "max": 1100
   },
   "mysql": {
@@ -14,19 +14,12 @@
   "tcp": {
     "enabled": true,
     "host": "127.0.0.1",
-    "port": 7171
+    "ports": [ 7171 ]
   },
   "http": {
     "enabled": true,
     "host": "127.0.0.1",
-    "port": 8000
-  },
-  "worlds": {
-    "0": {
-      "name": "Main world",
-      "host": "163.172.147.135",
-      "port": 7172
-    }
+    "ports": [ 8000 ]
   },
   "limits": {
     "connections": {

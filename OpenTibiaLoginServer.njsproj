@@ -37,11 +37,13 @@
     <Content Include="package.json" />
     <Content Include="README.md" />
     <Content Include="tsconfig.json" />
+    <Content Include="worlds\main_world.json" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="build\" />
     <Folder Include="src\" />
     <Folder Include="tests\" />
+    <Folder Include="worlds\" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="src\app.ts" />
@@ -60,6 +62,9 @@
     <TypeScriptCompile Include="src\limits.ts">
       <SubType>Code</SubType>
     </TypeScriptCompile>
+    <TypeScriptCompile Include="src\motd.ts">
+      <SubType>Code</SubType>
+    </TypeScriptCompile>
     <TypeScriptCompile Include="src\packet.ts">
       <SubType>Code</SubType>
     </TypeScriptCompile>
@@ -70,6 +75,9 @@
       <SubType>Code</SubType>
     </TypeScriptCompile>
     <TypeScriptCompile Include="src\tcp.ts">
+      <SubType>Code</SubType>
+    </TypeScriptCompile>
+    <TypeScriptCompile Include="src\utils.ts">
       <SubType>Code</SubType>
     </TypeScriptCompile>
     <TypeScriptCompile Include="src\websocket.ts">

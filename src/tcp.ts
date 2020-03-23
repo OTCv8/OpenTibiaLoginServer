@@ -5,7 +5,7 @@ import Crypto from './crypto';
 import DB from './db';
 import Limits from './limits';
 import { InputPacket, OutputPacket } from './packet';
-import { getMotd } from './motd';
+import { getMotd, getMotdId } from './motd';
 import Status from './status';
 import { ip2int } from './utils';
 
@@ -140,7 +140,7 @@ export default class TibiaTCP {
         if (packet_type == 0xFF) { // status check
             let output = await Status.process(this.host, this.port, packet);
             if (output) {
-                socket.write(output.getSendBuffer());
+                socket.write(output);
             }
             return;
         }
@@ -197,7 +197,7 @@ export default class TibiaTCP {
 
         let token;
         let stayLogged = true;
-        if (version >= 1072) { // auth token, unused by now
+        if (version >= 1072) { // auth token
             let decryptedAuthPacket = packet.rsaDecrypt();
             if (decryptedAuthPacket.getU8() != 0) {
                 throw "RSA decryption error (2)";
@@ -220,8 +220,8 @@ export default class TibiaTCP {
             return loginError(`Invalid client version (should be: ${Config.version.min}-${Config.version.max}, is: ${version}).`);
         }
 
-        if (!Limits.acceptAuthorization(socket.address().address)) {
-            return loginError("Too many login attempts.\nYou has been blocked for few minutes.");
+        if (socket && !Limits.acceptAuthorization(socket.address().address)) {
+            return loginError("Too many invalid login attempts.\nYou has been blocked for few minutes.");
         }
 
         let account;
@@ -231,36 +231,22 @@ export default class TibiaTCP {
             account = await DB.loadAccountByName(account_name); // by name, for >=840
         }
 
-        if (!account) {
-            Limits.addInvalidAuthorization(socket.address().address);
-            return loginError("Invalid account/password");
-        }
-
-        let hashed_password = account_password;
-        if (Config.encryption == "sha1") {
-            hashed_password = Crypto.sha1(hashed_password);
-        } else if (Config.encryption == "sha256") {
-            hashed_password = Crypto.sha256(hashed_password);
-        } else if (Config.encryption == "sha512") {
-            hashed_password = Crypto.sha512(hashed_password);
-        } else if (Config.encryption == "md5") {
-            hashed_password = Crypto.md5(hashed_password);
-        }
-
-        if (account.password != hashed_password) {
-            Limits.addInvalidAuthorization(socket.address().address);
+        let hashed_password = Crypto.hashPassword(account_password);
+        if (!account || account.password != hashed_password) {
+            if (socket) {
+                Limits.addInvalidAuthorization(socket.address().address);
+            }
             return loginError("Invalid account/password");
         }
 
         let characters = await DB.loadCharactersByAccountId(account.id);
-
         let outputPacket = new OutputPacket();
 
         // motd
         let motd = getMotd(account.id);
         if (motd) {
             outputPacket.addU8(0x14);
-            outputPacket.addString(motd);
+            outputPacket.addString(`${getMotdId(account.id)}\n${motd}`);
         }
 
         // session key
@@ -274,15 +260,14 @@ export default class TibiaTCP {
 
         if (version >= 1010) {
             // worlds
-            outputPacket.addU8(Object.keys(Config.worlds).length);
-            for (let worldId in Config.worlds) {
-                const world = Config.worlds[worldId];
-                outputPacket.addU8(parseInt(worldId));
+            outputPacket.addU8(Config.worlds.size);
+            Config.worlds.forEach((world, worldId) => {
+                outputPacket.addU8(worldId);
                 outputPacket.addString(world.name);
                 outputPacket.addString(world.host);
                 outputPacket.addU16(world.port);
-                outputPacket.addU8(0); // preview
-            }
+                outputPacket.addU8(world.preview ? 1 : 0);
+            });
 
             // characters
             outputPacket.addU8(characters.length);
@@ -291,12 +276,13 @@ export default class TibiaTCP {
                 outputPacket.addString(character.name);
             });
         } else {
+            // worlds & characters
             outputPacket.addU8(characters.length);
             characters.forEach(character => {
                 outputPacket.addString(character.name);
-                let world = Config.worlds[character.world_id.toString()]; // keys are numbers
+                let world = Config.worlds[character.world_id]; // keys are numbers
                 if (!world) {
-                    outputPacket.addString("INVALID WORLD")
+                    outputPacket.addString(`INVALID WORLD ${character.world_id}`)
                     outputPacket.addU32(0);
                     outputPacket.addU16(0);
                 } else {
@@ -305,7 +291,7 @@ export default class TibiaTCP {
                     outputPacket.addU16(world.port);
                 }
                 if (version >= 980) {
-                    outputPacket.addU8(0); // preview state
+                    outputPacket.addU8((world && world.preview) ? 1 : 0);
                 }
             });
         }
@@ -318,7 +304,6 @@ export default class TibiaTCP {
         } else {
             outputPacket.addU16(account.premdays);
         }
-
         this.send(socket, outputPacket, has_checksum, xtea);
     }
 
