@@ -5,7 +5,20 @@ let Config;
 let loadingError = "Can't find config.json";
 
 function validateConfig() {
-    // todo
+    if (Config.tcp.enabled) {
+        let used_ports = {}
+        Config.worlds.forEach(world => {
+            if (typeof (world.status_port) == 'number' && world.status_port > 0) {
+                if (used_ports[world.status_port]) {
+                    throw `Duplicated status port.\nStatus port for world ${world.name} is the same as status port for world ${used_ports[world.status_port]}.`
+                }
+                if (!Config.tcp.ports.includes(world.status_port)) {
+                    throw `Invalid status port for world: ${world.name}.\nThis status port ${world.status_port} is not present on tcp port list ${Config.tcp.ports}`;
+                }
+            }
+            used_ports[world.status_port] = world.name;
+        });
+    }
 }
 
 function loadConfig(dir: string): boolean {

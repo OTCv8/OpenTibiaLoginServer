@@ -6,5 +6,27 @@
   "preview": false,
   "location": "EUR",
   "pvptype": 1,
-  "status_port": 7171
+  "status_port": 7171,
+  "client": "11.00",
+  "maxplayers": 2500,
+  "monsters": 6666,
+  "npcs": 666,
+  "url": "http://otclient.ovh",
+  "owner": {
+    "name": "otclientv8",
+    "email": "otclient@otclient.ovh"
+  },
+  "rates": {
+    "experience": "10",
+    "skill": "2",
+    "loot": "2",
+    "magic": "2",
+    "spawn": "3"
+  },
+  "map": {
+    "name": "Super Tibia Map 2.0",
+    "author": "kondrah",
+    "width": "65000",
+    "height": "65000"
+  }
 }

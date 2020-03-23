@@ -96,6 +96,11 @@ class DB {
         }
     }
 
+    getPlayersOnline = async (): Promise<number> => {
+        let online = await this.query('SELECT COUNT(*) as count FROM `players_online`');
+        return online[0].count;
+    }
+
 
 }
 

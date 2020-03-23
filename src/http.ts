@@ -102,7 +102,7 @@ export default class TibiaHTTP {
         res.onAborted(() => {
             aborted = true;
         });
-        let status = await Status.get();
+        let status = await Status.getCached(0);
         if (!aborted) {
             res.end(status);
         }

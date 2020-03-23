@@ -1,7 +1,17 @@
 import { InputPacket, OutputPacket } from './packet';
 import { Builder } from 'xml2js';
 
+import Config from './config';
+import DB from './db';
+import { getMotd } from './motd';
+
+let UPDATE_INTERVAL = 5000;
+
 class Status {
+    start = Date.now();
+    peak = {};
+    cache = {};
+
     builder = new Builder({
         rootName: "xml",
         renderOpts: {
@@ -15,11 +25,42 @@ class Status {
     process = async (host: string, port: number, packet: InputPacket): Promise<string> => {
         let type = packet.getU8();
         if (type == 0xFF) { // general info
-            return await this.get();
+            let worldId;
+            Config.worlds.forEach((world) => {
+                if (world.status_port == port) {
+                    worldId = world.id;
+                }
+            });
+            if (worldId !== null) {
+                return await this.getCached(worldId);
+            }
+            return "WORLD_NOT_FOUND";
         }
+        return "INVALID_REQUEST";
     }
 
-    get = async () => {
+    getCached = async (world_id: number) => {
+        if (!this.cache[world_id] || this.cache[world_id].lastUpdate + UPDATE_INTERVAL < Date.now()) {
+            this.cache[world_id] = {
+                content: await this.get(world_id),
+                lastUpdate: Date.now()
+            };
+        }
+
+        return this.cache[world_id].content;
+    }
+
+    private get = async (world_id: number) => {
+        let world = Config.worlds.get(world_id);
+        if (!world) {
+            return "INVALID_WORLD_ID";
+        }
+
+        let playersOnline = await DB.getPlayersOnline();
+        if (!this.peak[world_id] || this.peak[world_id] <= playersOnline) {
+            this.peak[world_id] = playersOnline + 1;
+        }
+
         let status = {
             $: {
                 "version": "1.0",
@@ -30,58 +71,47 @@ class Status {
                 },
                 "serverinfo": {
                     $: {
-                        "uptime": "1000",
-                        "ip": "127.0.0.1",
-                        "servername": "OTClient.ovh",
-                        "port": "7171",
-                        "location": "Europe",
-                        "url": "http://otclient.ovh",
-                        "server": "OTLS",
-                        "version": "0.1.0",
-                        "client": "10.99"
+                        "uptime": Math.floor((Date.now() - this.start) / 1000),
+                        "ip": world.host,
+                        "port": world.port,
+                        "servername": world.name,
+                        "location": world.location,
+                        "url": world.url,
+                        "server": "Open Tibia Login Server",
+                        "version": "1.0",
+                        "client": world.client
                     }
                 },
                 "owner": {
                     $: {
-                        "name": "otclient",
-                        "email": "otclient@otclient.ovh"
+                        "name": world.owner.name,
+                        "email": world.owner.email
                     }
                 },
                 "players": {
                     $: {
-                        "online": "1",
-                        "max": "1",
-                        "peak": "1"
+                        "online": playersOnline,
+                        "max": world.maxplayers,
+                        "peak": this.peak[world_id]
                     }
                 },
                 "monsters": {
                     $: {
-                        "total": "10"
+                        "total": world.monsters
                     }
                 },
                 "npcs": {
                     $: {
-                        "total": "10"
+                        "total": world.npcs
                     }
                 },
                 "rates": {
-                    $: {
-                        "experience": "10",
-                        "skill": "2",
-                        "loot": "2",
-                        "magic": "2",
-                        "spawn": "3"
-                    }
+                    $: world.rates
                 },
                 "map": {
-                    $: {
-                        "name": "otc",
-                        "author": "noname",
-                        "width": "1000",
-                        "height": "1000"
-                    }
+                    $: world.map
                 },
-                "motd": "example motd"
+                "motd": getMotd()
             }
         };
         return this.builder.buildObject(status);

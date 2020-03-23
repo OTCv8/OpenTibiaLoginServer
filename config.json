@@ -14,7 +14,7 @@
   "tcp": {
     "enabled": true,
     "host": "127.0.0.1",
-    "ports": [ 7171 ]
+    "ports": [ 7171, 7172 ]
   },
   "http": {
     "enabled": true,

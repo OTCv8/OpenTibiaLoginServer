@@ -26,7 +26,7 @@ let server = new TibiaTCP();
 let benchmark = async (packet, name) => {
     console.log(`Benchmarking: ${name}`);
     let start = (new Date()).getTime();
-    let calls = []
+    let calls = [];
     for (let i = 0; i < packets; ++i) {
         calls.push(server.benchmark(packet));
     }
