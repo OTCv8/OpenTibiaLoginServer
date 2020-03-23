@@ -4,16 +4,17 @@ import { Mutex, MutexInterface } from 'async-mutex';
 
 import Config from './config';
 
-interface Account {
+export interface Account {
     id: number;
     name: string;
     password: string;
     type: number;
     premdays: number;
     email: string;
+    secret: string;
 }
 
-interface Character {
+export interface Character {
     id: number,
     name: string,
     world_id: number,
@@ -73,7 +74,8 @@ class DB {
             password: account.password,
             type: account.type,
             premdays: account.premdays,
-            email: account.email
+            email: account.email,
+            secret: account.secret || ""
         };
     }
 
@@ -96,7 +98,10 @@ class DB {
         }
     }
 
-    getPlayersOnline = async (): Promise<number> => {
+    getPlayersOnline = async (world_id?: number): Promise<number> => {
+        // todo: select by world_id
+        // todo: add option for limit by ip
+        // todo: dont count afk players
         let online = await this.query('SELECT COUNT(*) as count FROM `players_online`');
         return online[0].count;
     }

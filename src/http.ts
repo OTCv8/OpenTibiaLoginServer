@@ -193,6 +193,16 @@ export default class TibiaHTTP {
             return loginError("Invalid account/password");
         }
 
+        if (account.secret.length > 0) {
+            if (account_token.length == 0) {
+                return loginError("Two-factor token required for authentication.", 6);
+            }
+            if (!Crypto.validateToken(account_token, account.secret)) {
+                Limits.addInvalidAuthorization(Buffer.from(res.getRemoteAddress()));
+                return loginError("Invalid two-factor token.", 6);
+            }
+        }
+
         let characters = await DB.loadCharactersByAccountId(account.id);
 
         let response = {

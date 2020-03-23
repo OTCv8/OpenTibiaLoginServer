@@ -2,7 +2,7 @@ import * as net from 'net';
 
 import Config from './config';
 import Crypto from './crypto';
-import DB from './db';
+import DB, { Account, Character } from './db';
 import Limits from './limits';
 import { InputPacket, OutputPacket } from './packet';
 import { getMotd, getMotdId } from './motd';
@@ -195,23 +195,27 @@ export default class TibiaTCP {
             const gpu_version = packet.getString();
         }
 
-        let token;
+        let account_token: string;
         let stayLogged = true;
         if (version >= 1072) { // auth token
             let decryptedAuthPacket = packet.rsaDecrypt();
             if (decryptedAuthPacket.getU8() != 0) {
                 throw "RSA decryption error (2)";
             }
-            token = decryptedAuthPacket.getString();
+            account_token = decryptedAuthPacket.getString();
             if (version >= 1074) {
                 stayLogged = decryptedAuthPacket.getU8() > 0;
             }            
         }
 
         // function to make sending error easier
-        const loginError = (error: string) => {
+        const loginError = (error: string, code?: number) => {
             let outputPacket = new OutputPacket();
-            outputPacket.addU8(version >= 1076 ? 0x0B : 0x0A);
+            if (code) {
+                outputPacket.addU8(code);
+            } else {
+                outputPacket.addU8(version >= 1076 ? 0x0B : 0x0A);
+            }
             outputPacket.addString(error);
             this.send(socket, outputPacket, has_checksum, xtea);
         }
@@ -224,7 +228,7 @@ export default class TibiaTCP {
             return loginError("Too many invalid login attempts.\nYou has been blocked for few minutes.");
         }
 
-        let account;
+        let account : Account;
         if (typeof (account_name) == 'number') {
             account = await DB.loadAccountById(account_name); // by id, for <840
         } else {
@@ -239,8 +243,22 @@ export default class TibiaTCP {
             return loginError("Invalid account/password");
         }
 
-        let characters = await DB.loadCharactersByAccountId(account.id);
         let outputPacket = new OutputPacket();
+        let characters = await DB.loadCharactersByAccountId(account.id);
+
+        // token
+        if (account.secret.length > 0 && account_token != null) {
+            if (!Crypto.validateToken(account_token, account.secret)) {
+                if (socket && account_token.length > 0) {
+                    Limits.addInvalidAuthorization(socket.address().address);
+                }
+                outputPacket.addU8(0x0D); // invalid token
+                outputPacket.addU8(0);
+                return this.send(socket, outputPacket, has_checksum, xtea);
+            }
+            outputPacket.addU8(0x0C); // valid token
+            outputPacket.addU8(0);
+        }
 
         // motd
         let motd = getMotd(account.id);
@@ -252,7 +270,7 @@ export default class TibiaTCP {
         // session key
         if (version >= 1074) {
             outputPacket.addU8(0x28);
-            outputPacket.addString(`${account_name}\n${account_password}\n${token}\n${Math.floor(Date.now() / 1000)}`);
+            outputPacket.addString(`${account_name}\n${account_password}\n${account_token}\n${Math.floor(Date.now() / 1000)}`);
         }
 
         // worlds & characters & premium

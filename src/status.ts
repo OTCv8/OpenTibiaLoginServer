@@ -57,6 +57,7 @@ class Status {
         }
 
         let playersOnline = await DB.getPlayersOnline();
+        // todo: get real online peak
         if (!this.peak[world_id] || this.peak[world_id] <= playersOnline) {
             this.peak[world_id] = playersOnline + 1;
         }

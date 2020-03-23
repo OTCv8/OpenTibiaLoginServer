@@ -2,8 +2,13 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as constants from 'constants';
+import { authenticator } from 'otplib';
 
 import Config from './config';
+
+authenticator.options = {
+    window: 2
+};
 
 class Crypto {
     privateKey: string = null;
@@ -96,6 +101,10 @@ class Crypto {
             return this.md5(password);
         }
         return password;
+    }
+
+    validateToken = (token: string, secret: string): boolean => {
+        return authenticator .check(token, secret);
     }
 }
 
