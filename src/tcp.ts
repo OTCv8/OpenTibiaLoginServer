@@ -1,5 +1,7 @@
 import * as net from 'net';
 
+import Cams from './cams';
+import Casts from './casts';
 import Config from './config';
 import Crypto from './crypto';
 import DB, { Account, Character } from './db';
@@ -228,6 +230,16 @@ export default class TibiaTCP {
             return loginError("Too many invalid login attempts.\nYou has been blocked for few minutes.");
         }
 
+        let cams = await Cams.get(account_name, account_password);
+        if (cams !== null) {
+            return loginError("Cams are not done yet");
+        }
+
+        let casts = await Casts.get(account_name, account_password);
+        if (casts !== null) {
+            return loginError("Casts are not done yet");
+        }
+
         let account : Account;
         if (typeof (account_name) == 'number') {
             account = await DB.loadAccountById(account_name); // by id, for <840
@@ -262,7 +274,7 @@ export default class TibiaTCP {
 
         // motd
         let motd = getMotd(account.id);
-        if (motd) {
+        if (motd && motd.length > 0) {
             outputPacket.addU8(0x14);
             outputPacket.addString(`${getMotdId(account.id)}\n${motd}`);
         }

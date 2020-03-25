@@ -1,9 +1,9 @@
-
+import Config from './config';
 
 export function getMotdId(account_id?: number): number {
-    return 1;
+    return Config.motd.id;
 }
 
 export function getMotd(account_id?: number): string {
-    return "Hi. Test motd."
+    return Config.motd.text;
 }

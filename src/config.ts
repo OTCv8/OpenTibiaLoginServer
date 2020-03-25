@@ -23,11 +23,10 @@ function validateConfig() {
 
 function loadConfig(dir: string): boolean {
     try {
-        Config = require(path.resolve(`${dir}/config.json`));
-    } catch (e) {
-        return false;
-    }
-    try {
+        let file = path.resolve(`${dir}/config.json`)
+        if (!fs.existsSync(file))
+            return false;
+        Config = require(file);
         Config['worlds'] = new Map<number, any>();
         let worldsDir = path.resolve(`${dir}/worlds`);
         let files = fs.readdirSync(worldsDir);

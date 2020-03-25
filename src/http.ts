@@ -1,9 +1,12 @@
 import { TemplatedApp, WebSocket, HttpRequest, HttpResponse } from 'uWebSockets.js';
+import Cams from './cams';
+import Casts from './casts';
 import Config from './config';
 import Crypto from './crypto';
 import DB from './db';
 import Limits from './limits';
 import Status from './status';
+import { getVocationName } from './vocations';
 
 export default class TibiaHTTP {
 
@@ -72,6 +75,10 @@ export default class TibiaHTTP {
                     return;
                 }
 
+                if (buffer.length < 2) {
+                    throw "Empty data";
+                }
+
                 let data = JSON.parse(buffer);
                 if (data.type == "login") {
                     return this.login(res, data);
@@ -108,15 +115,22 @@ export default class TibiaHTTP {
         }
     }
 
-    private cacheInfo = (res: HttpResponse, data: any) => {
+    private cacheInfo = async (res: HttpResponse, data: any) => {
+        let aborted = false;
+        res.onAborted(() => {
+            aborted = true;
+        });
+
         let response = {
-            "twitchstreams": 10,
-            "playersonline": 100,
-            "gamingyoutubestreams": 5,
-            "twitchviewer": 20,
-            "gamingyoutubeviewer": 30
+            "twitchstreams": 0,
+            "playersonline": await Status.getTotalOnlineCached(),
+            "gamingyoutubestreams": 0,
+            "twitchviewer": 0,
+            "gamingyoutubeviewer": 0
         };
-        res.end(JSON.stringify(response));
+        if (!aborted) {
+            res.end(JSON.stringify(response));
+        }
     }
 
     private eventSchedule = (res: HttpResponse, data: any) => {
@@ -167,7 +181,7 @@ export default class TibiaHTTP {
         res.onAborted(() => {
             aborted = true;
         });
-
+        let ip_address = Buffer.from(res.getRemoteAddress());
         let account_name = data.accountname;
         let account_password = data.password;
         let account_token = data.token || "";
@@ -182,14 +196,24 @@ export default class TibiaHTTP {
             }));
         };
 
-        if (!Limits.acceptAuthorization(Buffer.from(res.getRemoteAddress()))) {
+        if (!Limits.acceptAuthorization(ip_address)) {
             return loginError("Too many invalid login attempts.\nYou has been blocked for few minutes.");
+        }
+
+        let cams = await Cams.get(account_name, account_password);
+        if (cams !== null) {
+            return loginError("Cams are not done yet");
+        }
+
+        let casts = await Casts.get(account_name, account_password);
+        if (casts !== null) {
+            return loginError("Casts are not done yet");
         }
 
         let account = await DB.loadAccountByName(account_name);
         let hashed_password = Crypto.hashPassword(account_password);
         if (!account || account.password != hashed_password) {
-            Limits.addInvalidAuthorization(Buffer.from(res.getRemoteAddress()));
+            Limits.addInvalidAuthorization(ip_address);
             return loginError("Invalid account/password");
         }
 
@@ -198,7 +222,7 @@ export default class TibiaHTTP {
                 return loginError("Two-factor token required for authentication.", 6);
             }
             if (!Crypto.validateToken(account_token, account.secret)) {
-                Limits.addInvalidAuthorization(Buffer.from(res.getRemoteAddress()));
+                Limits.addInvalidAuthorization(ip_address);
                 return loginError("Invalid two-factor token.", 6);
             }
         }
@@ -247,14 +271,14 @@ export default class TibiaHTTP {
                 "worldid": character.world_id,
                 "level": character.level,
                 "ishidden": false,
-                "headcolor": 95,
-                "legscolor": 9,
-                "torsocolor": 123,
-                "outfitid": 130,
-                "addonsflags": 0,
-                "vocation": "Druid",
+                "headcolor": character.lookhead,
+                "legscolor": character.looklegs,
+                "torsocolor": character.lookbody,
+                "detailcolor": character.lookfeet,
+                "outfitid": character.looktype,
+                "addonsflags": character.lookaddons,
+                "vocation": getVocationName(character.vocation),
                 "tutorial": false,
-                "detailcolor": 118,
                 "ismale": character.sex == 1
             });
         });

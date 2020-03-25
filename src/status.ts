@@ -11,6 +11,8 @@ class Status {
     start = Date.now();
     peak = {};
     cache = {};
+    totalOnline = 0;
+    totalOnlineCache = Date.now();
 
     builder = new Builder({
         rootName: "xml",
@@ -50,16 +52,24 @@ class Status {
         return this.cache[world_id].content;
     }
 
+    getTotalOnlineCached = async () => {
+        if (this.totalOnlineCache + UPDATE_INTERVAL < Date.now()) {
+            this.totalOnline = await DB.getPlayersOnline();
+        }
+        return this.totalOnline;
+    }
+
     private get = async (world_id: number) => {
         let world = Config.worlds.get(world_id);
         if (!world) {
             return "INVALID_WORLD_ID";
         }
 
-        let playersOnline = await DB.getPlayersOnline();
+        let playersOnline = await DB.getPlayersOnline(world_id);
+        let playersOnlinePeak = Math.max(playersOnline + 1, await DB.getOnlineRecord(world_id));
         // todo: get real online peak
-        if (!this.peak[world_id] || this.peak[world_id] <= playersOnline) {
-            this.peak[world_id] = playersOnline + 1;
+        if (!this.peak[world_id] || this.peak[world_id] <= playersOnlinePeak) {
+            this.peak[world_id] = playersOnlinePeak;
         }
 
         let status = {
@@ -80,7 +90,7 @@ class Status {
                         "url": world.url,
                         "server": "Open Tibia Login Server",
                         "version": "1.0",
-                        "client": world.client
+                        "client": Config.version.max
                     }
                 },
                 "owner": {

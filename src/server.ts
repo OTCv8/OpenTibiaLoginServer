@@ -23,7 +23,19 @@ export default class Server {
         }
 
         if (Config.http.enabled) {
-            this.app = App({});
+            if (Config.http.ssl.enabled) {
+                try {
+                    this.app = SSLApp({
+                        cert_file_name: Config.http.ssl.cert,
+                        key_file_name: Config.http.ssl.key,
+                        passphrase: Config.http.ssl.passphrase
+                    });
+                } catch (e) {
+                    throw `${e.toString()}\nMake sure if your SSL config for http server is correct`;
+                }
+            } else {
+                this.app = App({});
+            }
             this.http = new TibiaHTTP();
             this.ws = new TibiaWebSocket();
 

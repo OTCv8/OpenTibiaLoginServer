@@ -1,9 +1,15 @@
 {
   "keyFile": "key.pem",
   "encryption": "sha1",
+  "casts": true,
+  "cams": true,
   "version": {
     "min": 800,
     "max": 1100
+  },
+  "motd": {
+    "id": 1,
+    "text": "Hello!"
   },
   "mysql": {
     "host": "otclient.ovh",
@@ -13,13 +19,19 @@
   },
   "tcp": {
     "enabled": true,
-    "host": "127.0.0.1",
-    "ports": [ 7171, 7172 ]
+    "host": "0.0.0.0",
+    "ports": [ 7171 ]
   },
   "http": {
     "enabled": true,
-    "host": "127.0.0.1",
-    "ports": [ 8000 ]
+    "host": "0.0.0.0",
+    "ports": [ 8000 ],
+    "ssl": {
+      "enabled": false,
+      "cert": "ssl_cert.pem",
+      "key": "ssl_key.pem",
+      "passphrase": ""
+    }
   },
   "limits": {
     "connections": {
