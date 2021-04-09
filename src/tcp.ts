@@ -310,7 +310,7 @@ export default class TibiaTCP {
             outputPacket.addU8(characters.length);
             characters.forEach(character => {
                 outputPacket.addString(character.name);
-                let world = Config.worlds[character.world_id]; // keys are numbers
+                let world = Config.worlds.get(character.world_id); // keys are numbers
                 if (!world) {
                     outputPacket.addString(`INVALID WORLD ${character.world_id}`)
                     outputPacket.addU32(0);
